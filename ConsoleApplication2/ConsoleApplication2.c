@@ -75,10 +75,10 @@ DWORD WINAPI TrackingThreadFunction(void* data)
 
 void PrintAllLegalPaths(uint8_t pieceRow, uint8_t pieceColumn)
 {
-	struct PieceCoordinate bishop = { GetPiece(pieceRow, pieceColumn), pieceRow, pieceColumn };
+	struct PieceCoordinate piece = { GetPiece(pieceRow, pieceColumn), pieceRow, pieceColumn };
 	uint8_t numLegalPaths;
 	struct Coordinate allLegalPaths[MAX_LEGAL_MOVES] = { 0 };
-	CalculateAllLegalPathsAndChecks(bishop, allLegalPaths, &numLegalPaths);
+	CalculateAllLegalPathsAndChecks(piece, allLegalPaths, &numLegalPaths);
 
 	for (int8_t row = NUM_ROWS - 1; row >= 0; row--)
 	{
@@ -284,6 +284,7 @@ void TestIllegalMoves()
 	SimMove(6, 1, 4, 1); // Move black pawn
 	SMALL_DELAY();
 	
+	// Kill black pawn but move to wrong spot
 	SimSetSensor(3, 0, 0);
 	SMALL_DELAY();
 	SimSetSensor(4, 2, 1);
@@ -295,11 +296,11 @@ void TestIllegalMoves()
 	SMALL_DELAY();
 	SimSetSensor(3, 0, 0);
 	SMALL_DELAY();
-	SimSetSensor(5, 1, 1);
+	SimSetSensor(5, 1, 1); // Move to wrong spot after killing
 	SMALL_DELAY();
 	SimSetSensor(5, 1, 0);
 	SMALL_DELAY();
-	SimSetSensor(4, 1, 1);
+	SimSetSensor(4, 1, 1); // Move to right spot after killing
 	SMALL_DELAY();
 
 	SimSetSensor(4, 1, 0);
@@ -354,8 +355,33 @@ void TestIllegalMoves()
 	SMALL_DELAY();
 	SimSetSensor(6, 4, 1);
 	SMALL_DELAY();
-
 	PrintAllLegalPathsForTeam(BLACK);
+	
+	// Kill rook with knight
+	SimSetSensor(6, 4, 0);
+	SMALL_DELAY();
+	SimSetSensor(7, 6, 0);
+	SMALL_DELAY();
+	SimSetSensor(6, 4, 1);
+	SMALL_DELAY();
+
+	// Kill black pawn
+	PrintAllLegalPaths(4, 1);
+	SimSetSensor(5, 0, 0);
+	SMALL_DELAY();
+	SimSetSensor(4, 1, 0);
+	SMALL_DELAY();
+	SimSetSensor(5, 0, 1);
+	SMALL_DELAY();
+
+	// Move rook illegally then back legally
+	SimMove(7, 0, 6, 1);
+	SMALL_DELAY();
+	SimMove(6, 1, 7, 0);
+	SMALL_DELAY();
+	SimMove(7, 0, 6, 0);
+	SMALL_DELAY();
+
 
 }
 

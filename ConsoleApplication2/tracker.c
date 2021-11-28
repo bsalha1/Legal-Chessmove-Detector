@@ -36,6 +36,7 @@ static void CheckChessboardValidity(uint8_t switchTurns);
 static void EndTurn();
 static void SetPiece(uint8_t row, uint8_t column, struct Piece piece);
 static void SetPieceCoordinate(struct PieceCoordinate pieceCoordinate);
+static void ClearPiece(struct PieceCoordinate* pieceCoordinate);
 
 // Legal Move Detection //
 static uint8_t ValidateMove(struct PieceCoordinate from, struct PieceCoordinate to);
@@ -45,7 +46,8 @@ static uint8_t DidOtherTeamPickupLast(struct Piece piece);
 static uint8_t DidSameTeamPickupLast(struct Piece piece);
 
 // Utilities //
-uint8_t PawnReachedEnd(struct PieceCoordinate pieceCoordinate);
+static uint8_t PawnReachedEnd(struct PieceCoordinate pieceCoordinate);
+static uint8_t PieceExists(struct PieceCoordinate placedPiece);
 
 
 
@@ -185,6 +187,9 @@ void InitTracker()
 		IllegalPieces[i].destination = EMPTY_PIECE_COORDINATE;
 		IllegalPieces[i].current = EMPTY_PIECE_COORDINATE;
 	}
+
+	// Initialize PathFinder
+	CalculateTeamsLegalMoves(CurrentTurn);
 }
 
 static void WriteColumn(uint8_t column)
@@ -257,19 +262,19 @@ static void HandlePlace(struct PieceCoordinate placedPiece)
 		HandlePlaceIllegalState(placedPiece);
 	}
 
-	// Don't do anything except update board if piece did not move
+	// If the piece lifted did not move, don't do anything except update Chessboard
 	else if (IsPieceCoordinateSamePosition(placedPiece, LastPickedUpPiece))
 	{
 		HandlePlaceNoMove(placedPiece);
 	}
 
-	// If there's a piece being killed, this placement should be in its stead (if it's a legal/possible kill)
+	// If there's a piece being killed, this placement should be in its stead
 	else if (PieceExists(PieceToKill))
 	{
 		HandlePlaceKill(placedPiece);
 	}
 
-	// If player is castling
+	// If player is castling, this placement should be the king or rook being placed in the right spots
 	else if (PieceExists(ExpectedKingCastleCoordinate) || PieceExists(ExpectedRookCastleCoordinate))
 	{
 		HandlePlaceCastling(placedPiece);
@@ -329,6 +334,8 @@ static void HandlePlaceNoMove(struct PieceCoordinate placedPiece)
 
 static void HandlePlaceKill(struct PieceCoordinate placedPiece)
 {
+	SetPiece(placedPiece.row, placedPiece.column, LastPickedUpPiece.piece);
+
 	// If player put killer in victim's place, clear PieceToKill
 	if (IsPieceCoordinateSamePosition(PieceToKill, placedPiece))
 	{
@@ -344,7 +351,6 @@ static void HandlePlaceKill(struct PieceCoordinate placedPiece)
 		AddIllegalPiece(placedPiece, killerDestination);
 		SwitchTurnsAfterLegalState = 1;
 	}
-	SetPiece(placedPiece.row, placedPiece.column, LastPickedUpPiece.piece);
 }
 
 static void HandlePlaceCastling(struct PieceCoordinate placedPiece)
@@ -390,7 +396,10 @@ static void HandlePlaceCastling(struct PieceCoordinate placedPiece)
 
 static void HandlePlaceMove(struct PieceCoordinate placedPiece)
 {
-	if (ValidateMove(LastPickedUpPiece, placedPiece))
+	uint8_t isMoveValid = ValidateMove(LastPickedUpPiece, placedPiece);
+	SetPiece(placedPiece.row, placedPiece.column, LastPickedUpPiece.piece);
+
+	if (isMoveValid)
 	{
 		EndTurn();
 	}
@@ -399,12 +408,10 @@ static void HandlePlaceMove(struct PieceCoordinate placedPiece)
 	{
 		AddIllegalPiece(placedPiece, LastPickedUpPiece);
 	}
-	SetPiece(placedPiece.row, placedPiece.column, LastPickedUpPiece.piece);
 }
 
 static void HandlePlacePreemptPromotion(struct PieceCoordinate placedPiece)
 {
-	/// @todo trigger audio cue to promote and then enable the button 1 and button 2 to be queen and knight 
 	PawnToPromote = placedPiece;
 }
 
@@ -438,7 +445,7 @@ static void HandlePickup(struct PieceCoordinate pickedUpPiece)
 		HandlePickupIllegalState(pickedUpPiece);
 	}
 	
-	// If player picked up piece from other team, they will kill pieceCoordinate
+	// If player picked up piece from other team, they will kill it
 	else if (pickedUpPiece.piece.owner != CurrentTurn)
 	{
 		HandlePickupPreemptKill(pickedUpPiece);
@@ -456,7 +463,7 @@ static void HandlePickup(struct PieceCoordinate pickedUpPiece)
 		HandlePickupPromotion(pickedUpPiece);
 	}
 
-	// Same team picked up piece twice in a row castling is occurring
+	// Same team picked up piece twice in a row, so castling is occurring
 	else if (DidSameTeamPickupLast(pickedUpPiece.piece))
 	{
 		HandlePickupCastling(pickedUpPiece);
@@ -640,19 +647,7 @@ static uint8_t ValidateKill(struct PieceCoordinate victim, struct PieceCoordinat
  */
 static uint8_t ValidateMove(struct PieceCoordinate from, struct PieceCoordinate to)
 {
-	uint8_t numLegalPaths;
-	struct Coordinate allLegalPaths[MAX_LEGAL_MOVES] = { 0 };
-	CalculateAllLegalPathsAndChecks(from, allLegalPaths, &numLegalPaths);
-
-	for (uint8_t i = 0; i < numLegalPaths; i++)
-	{
-		if ((allLegalPaths[i].column == to.column) && (allLegalPaths[i].row == to.row))
-		{
-			return 1;
-		}
-	}
-
-	return 0;
+	return IsLegalMove(from, to);
 }
 
 /**
@@ -728,6 +723,10 @@ static void EndTurn()
 	{
 		PRINT_SIM("Switching team to BLACK");
 	}
+
+	// Invoke PathFinder to store all legal moves for this team
+	CalculateTeamsLegalMoves(CurrentTurn);
+
 }
 
 static void UpdateCastleFlags()
@@ -828,4 +827,9 @@ inline uint8_t IsPieceCoordinateEqual(struct PieceCoordinate pieceCoordinate1, s
 inline uint8_t IsPieceCoordinateSamePosition(struct PieceCoordinate pieceCoordinate1, struct PieceCoordinate pieceCoordinate2)
 {
 	return pieceCoordinate1.row == pieceCoordinate2.row && pieceCoordinate1.column == pieceCoordinate2.column;
+}
+
+inline enum PieceOwner GetCurrentTurn()
+{
+	return CurrentTurn;
 }

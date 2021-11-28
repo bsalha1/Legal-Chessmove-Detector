@@ -26,22 +26,13 @@ static uint8_t IsPieceCoordinateSameTeam(struct PieceCoordinate pieceCoordinate1
 
 // Allows us to draft moves and their consequences without effecting the real chessboard
 static struct Piece MockChessboard[NUM_ROWS][NUM_COLS];
-static struct PieceCoordinate PossibleMoveMap[NUM_PIECE_TYPES * 128 + NUM_PIECE_OWNERS * 64 + 64][MAX_LEGAL_MOVES];
 
-/*
-uint16_t GetHashCode(struct PieceCoordinate pieceCoordinate)
-{
-	return pieceCoordinate.piece.type * 128 + pieceCoordinate.piece.owner * 64 + pieceCoordinate.row * 8 + pieceCoordinate.column;
-}
+// All legal moves for the current team - calculated at the beginning of each turn
+static struct Moves LegalMoveSet[PIECES_PER_TEAM];
 
-void AddPossibleMove(struct PieceCoordinate from, struct PieceCoordinate to)
+void CalculateTeamsLegalMoves(enum PieceOwner owner)
 {
-	PossibleMoveMap[GetHashCode(from)]
-}
-*/
-
-void CalculateAllLegalPathsAndChecks(struct PieceCoordinate from, struct Coordinate* allLegalPaths, uint8_t* numLegalPaths)
-{
+	// Initialize MockChessboard with current chessboard
 	for (uint8_t row = 0; row < NUM_ROWS; row++)
 	{
 		for (uint8_t column = 0; column < NUM_COLS; column++)
@@ -49,6 +40,58 @@ void CalculateAllLegalPathsAndChecks(struct PieceCoordinate from, struct Coordin
 			MockChessboard[row][column] = GetPiece(row, column);
 		}
 	}
+
+	// Get all pieces for this team
+	uint8_t numTeamPieces;
+	struct PieceCoordinate teamsPieces[PIECES_PER_TEAM];
+	GetPiecesForTeam(owner, teamsPieces, &numTeamPieces);
+
+	for (uint8_t i = 0; i < numTeamPieces; i++)
+	{
+		struct PieceCoordinate teamPiece = teamsPieces[i];
+
+		// Get all legal paths for teamPiece
+		uint8_t numLegalPaths;
+		struct Coordinate allLegalPaths[MAX_LEGAL_MOVES];
+		CalculateAllLegalPathsAndChecks(teamPiece, allLegalPaths, &numLegalPaths);
+
+		// Add possible moves for this piece
+		LegalMoveSet[i].from = teamPiece;
+		LegalMoveSet[i].numMoves = numLegalPaths;
+		for (uint8_t j = 0; j < numLegalPaths; j++)
+		{
+			LegalMoveSet[i].moves[j] = allLegalPaths[j];
+		}
+	}
+}
+
+uint8_t IsLegalMove(struct PieceCoordinate from, struct PieceCoordinate to)
+{
+	// Find the legal moves for "from"
+	struct Moves legalMoves;
+	for (uint8_t i = 0; i < PIECES_PER_TEAM; i++)
+	{
+		if (IsPieceCoordinateEqual(from, LegalMoveSet[i].from))
+		{
+			legalMoves = LegalMoveSet[i];
+			break;
+		}
+	}
+
+	// Go through all legal moves and make sure "to" is in there
+	for (uint8_t i = 0; i < legalMoves.numMoves; i++)
+	{
+		if ((to.row == legalMoves.moves[i].row) && (to.column == legalMoves.moves[i].column))
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
+
+
+void CalculateAllLegalPathsAndChecks(struct PieceCoordinate from, struct Coordinate* allLegalPaths, uint8_t* numLegalPaths)
+{
 
 	CalculateAllLegalPaths(from, allLegalPaths, numLegalPaths, 1);
 }

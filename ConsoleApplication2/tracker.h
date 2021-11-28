@@ -77,11 +77,16 @@ uint8_t ValidateStartPositions(void);
 
 
 /**
+ * @brief Gets the current turn in the chess game.
+ */
+enum PieceOwner GetCurrentTurn();
+
+
+/**
  * @brief Returns the piece at the specified row and column.
  */
 struct Piece GetPiece(uint8_t row, uint8_t column);
 struct PieceCoordinate GetPieceCoordinate(uint8_t row, uint8_t column);
-struct Piece** GetChessboard();
 
 // Comparison //
 uint8_t IsPieceEqual(struct Piece piece1, struct Piece piece2);
@@ -89,8 +94,6 @@ uint8_t IsPiecePresent(uint8_t row, uint8_t column);
 uint8_t IsPieceCoordinateEqual(struct PieceCoordinate pieceCoordinate1, struct PieceCoordinate pieceCoordinate2);
 uint8_t IsPieceCoordinateSamePosition(struct PieceCoordinate pieceCoordinate1, struct PieceCoordinate pieceCoordinate2);
 
-
-uint8_t PieceExists(struct PieceCoordinate placedPiece);
-void ClearPiece(struct PieceCoordinate* pieceCoordinate);
+// State 
 
 #endif // TRACKER_H

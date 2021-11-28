@@ -63,9 +63,10 @@ struct IllegalMove {
 };
 
 
-struct Move {
+struct Moves {
 	struct PieceCoordinate from;
-	struct PieceCoordinate to;
+	struct Coordinate moves[MAX_LEGAL_MOVES];
+	uint8_t numMoves;
 };
 
 
